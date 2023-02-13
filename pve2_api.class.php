@@ -25,17 +25,23 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 */
 
-class PVE2_Exception extends RuntimeException {}
+class PVE2_Exception extends RuntimeException
+{
+}
 
-class PVE2_API {
+class PVE2_API
+{
 	protected $hostname;
 	protected $username;
 	protected $realm;
 	protected $tokenString;
 	protected $port;
 	protected $verify_ssl;
+	protected $cluster_node_list;
+	protected $cluster_vms_list;
 
-	public function __construct ($hostname, $username, $realm, $tokenId, $tokenSecret, $port = 8006, $verify_ssl = false) {
+	public function __construct($hostname, $username, $realm, $tokenId, $tokenSecret, $port = 8006, $verify_ssl = false)
+	{
 		if (empty($hostname) || empty($username) || empty($realm) || empty($tokenId) || empty($tokenSecret) || empty($port)) {
 			throw new PVE2_Exception("Hostname/Username/Realm/API Token ID/API Token Secret required for PVE2_API object constructor.", 1);
 		}
@@ -52,8 +58,8 @@ class PVE2_API {
 			throw new PVE2_Exception("verify_ssl must be boolean.", 7);
 		}
 
-        // Create API Token String
-        $this->tokenString = "PVEAPIToken=" . $username . "@" . $realm . "!" . $tokenId . "=" . $tokenSecret;
+		// Create API Token String
+		$this->tokenString = "PVEAPIToken=" . $username . "@" . $realm . "!" . $tokenId . "=" . $tokenSecret;
 
 		$this->hostname   = $hostname;
 		$this->username   = $username;
@@ -68,24 +74,26 @@ class PVE2_API {
 	 * This method is responsible for the general cURL requests to the JSON API,
 	 * and sits behind the abstraction layer methods get/put/post/delete etc.
 	 */
-	private function action ($action_path, $http_method, $put_post_parameters = null) {
+	private function action($action_path, $http_method, $put_post_parameters = null)
+	{
 		// Check if we have a prefixed / on the path, if not add one.
 		if (substr($action_path, 0, 1) != "/") {
-			$action_path = "/".$action_path;
+			$action_path = "/" . $action_path;
 		}
 
 		// Prepare cURL resource.
 		$prox_ch = curl_init();
 		curl_setopt($prox_ch, CURLOPT_URL, "https://{$this->hostname}:{$this->port}/api2/json{$action_path}");
 
-        $prox_http_headers = array();
-        $prox_http_headers[] = "Authorization: " . $this->tokenString;
+		$prox_http_headers = array();
+		$prox_http_headers[] = "Authorization: " . $this->tokenString;
 
 		// Lets decide what type of action we are taking...
 		switch ($http_method) {
 			case "GET":
 				// Nothing extra to do.
 				break;
+
 			case "PUT":
 				curl_setopt($prox_ch, CURLOPT_CUSTOMREQUEST, "PUT");
 
@@ -93,8 +101,8 @@ class PVE2_API {
 				$action_postfields_string = http_build_query($put_post_parameters);
 				curl_setopt($prox_ch, CURLOPT_POSTFIELDS, $action_postfields_string);
 				unset($action_postfields_string);
-
 				break;
+
 			case "POST":
 				curl_setopt($prox_ch, CURLOPT_POST, true);
 
@@ -102,20 +110,19 @@ class PVE2_API {
 				$action_postfields_string = http_build_query($put_post_parameters);
 				curl_setopt($prox_ch, CURLOPT_POSTFIELDS, $action_postfields_string);
 				unset($action_postfields_string);
-
 				break;
+
 			case "DELETE":
 				curl_setopt($prox_ch, CURLOPT_CUSTOMREQUEST, "DELETE");
 				// No "POST" data required, the delete destination is specified in the URL.
-
 				break;
+
 			default:
 				throw new PVE2_Exception("Error - Invalid HTTP Method specified.", 5);
-				return false;
 		}
 
 		curl_setopt($prox_ch, CURLOPT_HEADER, true);
-        curl_setopt($prox_ch, CURLOPT_HTTPHEADER, $prox_http_headers);
+		curl_setopt($prox_ch, CURLOPT_HTTPHEADER, $prox_http_headers);
 		curl_setopt($prox_ch, CURLOPT_RETURNTRANSFER, true);
 		curl_setopt($prox_ch, CURLOPT_SSL_VERIFYPEER, false);
 		curl_setopt($prox_ch, CURLOPT_SSL_VERIFYHOST, false);
@@ -177,7 +184,8 @@ class PVE2_API {
 	 * We need this for future get/post/put/delete calls.
 	 * ie. $this->get("nodes/XXX/status"); where XXX is one of the values from this return array.
 	 */
-	public function reload_node_list () {
+	public function reload_node_list()
+	{
 		$node_list = $this->get("/nodes");
 		if (count($node_list) > 0) {
 			$nodes_array = array();
@@ -196,7 +204,8 @@ class PVE2_API {
 	 * array get_node_list ()
 	 *
 	 */
-	public function get_node_list () {
+	public function get_node_list()
+	{
 		// We run this if we haven't queried for cluster nodes as yet, and cache it in the object.
 		if ($this->cluster_node_list == null) {
 			if ($this->reload_node_list() === false) {
@@ -212,7 +221,8 @@ class PVE2_API {
 	 * Get Last VMID from a Cluster or a Node
 	 * returns a VMID, or false if not found.
 	 */
-	public function get_next_vmid () {
+	public function get_next_vmid()
+	{
 		$vmid = $this->get("/cluster/nextid");
 		if ($vmid == null) {
 			return false;
@@ -225,23 +235,24 @@ class PVE2_API {
 	 * array get_vms ()
 	 * Get List of all vms
 	 */
-	public function get_vms () {
+	public function get_vms()
+	{
 		$node_list = $this->get_node_list();
-		$result=[];
+		$result = [];
 		if (count($node_list) > 0) {
 			foreach ($node_list as $node_name) {
 				$vms_list = $this->get("nodes/" . $node_name . "/qemu/");
 				if (count($vms_list) > 0) {
-					$key_values = array_column($vms_list, 'vmid'); 
+					$key_values = array_column($vms_list, 'vmid');
 					array_multisort($key_values, SORT_ASC, $vms_list);
-					foreach($vms_list as &$row) {
-						$row[node] = $node_name;
+					foreach ($vms_list as &$row) {
+						$row['node'] = $node_name;
 					}
 					$result = array_merge($result, $vms_list);
 				}
 				if (count($result) > 0) {
-					$this->$cluster_vms_list = $result;
-					return $this->$cluster_vms_list;
+					$this->cluster_vms_list = $result;
+					return $this->cluster_vms_list;
 				} else {
 					error_log(" Empty list of vms returned in this cluster.");
 					return false;
@@ -252,19 +263,20 @@ class PVE2_API {
 			return false;
 		}
 	}
-	
+
 	/*
 	 * bool|int start_vm ($node,$vmid)
 	 * Start specific vm
 	 */
-	public function start_vm ($node,$vmid) {
-		if(isset($vmid) && isset($node)){
+	public function start_vm($node, $vmid)
+	{
+		if (isset($vmid) && isset($node)) {
 			$parameters = array(
 				"vmid" => $vmid,
 				"node" => $node,
 			);
 			$url = "/nodes/" . $node . "/qemu/" . $vmid . "/status/start";
-			$post = $this->post($url,$parameters);
+			$post = $this->post($url, $parameters);
 			if ($post) {
 				error_log("Started vm " . $vmid . "");
 				return true;
@@ -277,20 +289,21 @@ class PVE2_API {
 			return false;
 		}
 	}
-	
+
 	/*
 	 * bool|int shutdown_vm ($node,$vmid)
 	 * Gracefully shutdown specific vm
 	 */
-	public function shutdown_vm ($node,$vmid) {
-		if(isset($vmid) && isset($node)){
+	public function shutdown_vm($node, $vmid)
+	{
+		if (isset($vmid) && isset($node)) {
 			$parameters = array(
 				"vmid" => $vmid,
 				"node" => $node,
 				"timeout" => 60,
 			);
 			$url = "/nodes/" . $node . "/qemu/" . $vmid . "/status/shutdown";
-			$post = $this->post($url,$parameters);
+			$post = $this->post($url, $parameters);
 			if ($post) {
 				error_log("Shutdown vm " . $vmid . "");
 				return true;
@@ -308,15 +321,16 @@ class PVE2_API {
 	 * bool|int stop_vm ($node,$vmid)
 	 * Force stop specific vm
 	 */
-	public function stop_vm ($node,$vmid) {
-		if(isset($vmid) && isset($node)){
+	public function stop_vm($node, $vmid)
+	{
+		if (isset($vmid) && isset($node)) {
 			$parameters = array(
 				"vmid" => $vmid,
 				"node" => $node,
 				"timeout" => 60,
 			);
 			$url = "/nodes/" . $node . "/qemu/" . $vmid . "/status/stop";
-			$post = $this->post($url,$parameters);
+			$post = $this->post($url, $parameters);
 			if ($post) {
 				error_log("Stopped vm " . $vmid . "");
 				return true;
@@ -329,19 +343,20 @@ class PVE2_API {
 			return false;
 		}
 	}
-	
+
 	/*
 	 * bool|int resume_vm ($node,$vmid)
 	 * Resume from suspend specific vm
 	 */
-	public function resume_vm ($node,$vmid) {
-		if(isset($vmid) && isset($node)){
+	public function resume_vm($node, $vmid)
+	{
+		if (isset($vmid) && isset($node)) {
 			$parameters = array(
 				"vmid" => $vmid,
 				"node" => $node,
 			);
 			$url = "/nodes/" . $node . "/qemu/" . $vmid . "/status/resume";
-			$post = $this->post($url,$parameters);
+			$post = $this->post($url, $parameters);
 			if ($post) {
 				error_log("Resumed vm " . $vmid . "");
 				return true;
@@ -354,19 +369,20 @@ class PVE2_API {
 			return false;
 		}
 	}
-	
+
 	/*
 	 * bool|int suspend_vm ($node,$vmid)
 	 * Suspend specific vm
 	 */
-	public function suspend_vm ($node,$vmid) {
-		if(isset($vmid) && isset($node)){
+	public function suspend_vm($node, $vmid)
+	{
+		if (isset($vmid) && isset($node)) {
 			$parameters = array(
 				"vmid" => $vmid,
-                		"node" => $node,
+				"node" => $node,
 			);
 			$url = "/nodes/" . $node . "/qemu/" . $vmid . "/status/suspend";
-			$post = $this->post($url,$parameters);
+			$post = $this->post($url, $parameters);
 			if ($post) {
 				error_log("Suspended vm " . $vmid . "");
 				return true;
@@ -379,13 +395,14 @@ class PVE2_API {
 			return false;
 		}
 	}
-	
+
 	/*
 	 * bool|int clone_vm ($node,$vmid)
 	 * Create fullclone of vm
 	 */
-	public function clone_vm ($node,$vmid) {
-		if(isset($vmid) && isset($node)){
+	public function clone_vm($node, $vmid)
+	{
+		if (isset($vmid) && isset($node)) {
 			$lastid = $this->get_next_vmid();
 			$parameters = array(
 				"vmid" => $vmid,
@@ -394,7 +411,7 @@ class PVE2_API {
 				"full" => true,
 			);
 			$url = "/nodes/" . $node . "/qemu/" . $vmid . "/clone";
-			$post = $this->post($url,$parameters);
+			$post = $this->post($url, $parameters);
 			if ($post) {
 				error_log("Cloned vm " . $vmid . " to " . $lastid . "");
 				return true;
@@ -411,11 +428,12 @@ class PVE2_API {
 	/*
 	 * bool|int snapshot_vm ($node,$vmid,$snapname = NULL)
 	 * Create snapshot of vm
-	 */	
-	public function snapshot_vm ($node,$vmid,$snapname = NULL) {
-		if(isset($vmid) && isset($node)){
+	 */
+	public function snapshot_vm($node, $vmid, $snapname = NULL)
+	{
+		if (isset($vmid) && isset($node)) {
 			$lastid = $this->get_next_vmid();
-			if (is_null($snapname)){
+			if (is_null($snapname)) {
 				$parameters = array(
 					"vmid" => $vmid,
 					"node" => $node,
@@ -430,7 +448,7 @@ class PVE2_API {
 				);
 			}
 			$url = "/nodes/" . $node . "/qemu/" . $vmid . "/snapshot";
-			$post = $this->post($url,$parameters);
+			$post = $this->post($url, $parameters);
 			if ($post) {
 				error_log("Cloned vm " . $vmid . " to " . $lastid . "");
 				return true;
@@ -443,12 +461,13 @@ class PVE2_API {
 			return false;
 		}
 	}
-	
+
 	/*
 	 * bool|string get_version ()
 	 * Return the version and minor revision of Proxmox Server
 	 */
-	public function get_version () {
+	public function get_version()
+	{
 		$version = $this->get("/version");
 		if ($version == null) {
 			return false;
@@ -460,31 +479,32 @@ class PVE2_API {
 	/*
 	 * object/array? get (string action_path)
 	 */
-	public function get ($action_path) {
+	public function get($action_path)
+	{
 		return $this->action($action_path, "GET");
 	}
 
 	/*
 	 * bool put (string action_path, array parameters)
 	 */
-	public function put ($action_path, $parameters) {
+	public function put($action_path, $parameters)
+	{
 		return $this->action($action_path, "PUT", $parameters);
 	}
 
 	/*
 	 * bool post (string action_path, array parameters)
 	 */
-	public function post ($action_path, $parameters) {
+	public function post($action_path, $parameters)
+	{
 		return $this->action($action_path, "POST", $parameters);
 	}
 
 	/*
 	 * bool delete (string action_path)
 	 */
-	public function delete ($action_path) {
+	public function delete($action_path)
+	{
 		return $this->action($action_path, "DELETE");
 	}
-
 }
-
-?>
